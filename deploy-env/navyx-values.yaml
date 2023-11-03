@@ -1,0 +1,13 @@
+## Define the value which you plan to override the default values.yaml
+## Copy the content from values.yaml and replace the value you want to override
+## Assume you have multiple environments, you can create multiple custom values.yaml in deploy/dev
+## Once you specify the section you want to override, helm will use the value from your custom values.yaml
+## For example, if you add image section here, 
+## it will override the image section in values.yaml as well as the corresponding key/Value like repository, tag, pullPolicy
+
+image:
+  ## Replace it with your repository/image
+  repository: YOUR_REPOSITORY_NAME/YOUR_IMAGE_NAME
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: YOUR_IMAGE_VERSION_NUMBER

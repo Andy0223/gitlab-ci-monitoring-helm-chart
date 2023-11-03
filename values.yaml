@@ -1,0 +1,203 @@
+# Default values for gitlab-ci-monitoring.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  ## Replace it with your repository/image
+  repository: REPOSITORY_NAME/IMAGE_NAME
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: VERSION_NUMBER
+  args:
+    - main.py
+
+## Define the env variables which you'll use in your application
+## Repalec these config depending on your application
+env:
+  PRIVATE_ACCESS_TOKEN:
+    name: K8S_SECRET_NAME
+    key: K8S_SECRET_NAME_CORRESPONDING_KEY
+  GROUP_ID: GROUP_ID_TO_MONITOR
+  IGNORED_SUBGROUPS_PATH_LIST: IGNORED_SUBGROUPS_PATH_LIST
+
+imagePullSecrets:
+  - name: YOUR_DOCKER_SECRET_NAME
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: EXPORTER_PORT_NUM
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+## Prometheus Configuration
+prometheus:
+  enabled: true
+  server:
+    persistentVolume:
+      annotations: 
+        "helm.sh/resource-policy": keep
+      existingClaim: ""
+      #   "gitlab-ci-monitoring-prometheus-server"
+      volumeName: ""
+      #   "pvc-d357b0f7-12a9-4a7d-a25c-b21e70dfb303"
+    global:
+      scrape_interval: 90s
+      scrape_timeout: 15s
+      evaluation_interval: 15s
+    service:
+      servicePort: PROMETHEUS_SERVER_PORT_NUM
+    retention: "180d"
+  serverFiles:
+    prometheus.yml:
+      scrape_configs:
+        - job_name: prometheus
+          static_configs:
+            - targets:
+              - PROMETHEUS_SERVER_POD_NAME:PORT_NUM # SERVICE_NAME:SERVICE_PORT
+        - job_name: 'gitlab-ci-monitoring-exporter'
+          static_configs:
+            - targets:
+              - EXPORTER_POD_NAME:PORT_NUM # SERVICE_NAME:SERVICE_PORT
+  alertmanager:
+    enabled: false
+  kube-state-metrics:
+    enabled: false
+  prometheus-node-exporter:
+    enabled: false
+  prometheus-pushgateway:
+    enabled: false
+
+## Grafana Configuration
+grafana:
+  enabled: true
+  ingress:
+    enabled: true
+    fullName: INGRESS_NAME
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: 11m
+    path: /
+    pathType: ImplementationSpecific
+    hosts:
+      - YOUR_GRAFANA_DOMAIN_NAME
+    http:
+      paths:
+      - backend:
+          service:
+            name: GRAFANA_K8S_SERVICE_NAME
+            port:
+              number: 80
+        path: /
+        pathType: ImplementationSpecific
+  persistence:
+    enabled: true
+    annotations: 
+      "helm.sh/resource-policy": keep
+    existingClaim: ""
+      # "gitlab-ci-monitoring-grafana"
+  admin:
+    existingSecret: YOUR_GRAFANA_ADMIN_K8S_SECRET_NAME
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://PROMETHEUS_SERVER_POD_NAME:PORT_NUM
+        access: proxy
+        isDefault: true
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+  ## If you have dashboards already, you can add them here
+  # dashboards: 
+  #   default:
+  #     gitlab-job-dashboard:
+  #       file: dashboards/gitlab-job-dashboard.json 
+  #     gitlab-pipeline-dashboard:
+  #       file: dashboards/gitlab-pipeline-dashboard.json 
+  #     gitlab-runner-dashboard:
+  #       file: dashboards/gitlab-runner-dashboard.json
+  grafana.ini:
+    users:
+      viewers_can_edit: false 
+    auth:
+      disable_login_form: false 
+      disable_signout_menu: false
+    auth.anonymous:
+      enabled: true 
+      org_role: Viewer
+
